@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Face Bird Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body {
+      margin: 0;
+      background: skyblue;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+
+    canvas {
+      background: linear-gradient(#87CEEB, #e0f7ff);
+      border: 2px solid black;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 18px;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<button id="restartBtn">Restart Game</button>
+
+<script>
+let canvas = document.getElementById("gameCanvas");
+let ctx = canvas.getContext("2d");
+let restartBtn = document.getElementById("restartBtn");
+
+canvas.width = 360;
+canvas.height = 600;
+
+// 🐦 Bird Image
+let birdImg = new Image();
+birdImg.src = "/IMG_20260323_100555.png";
+
+// 🔊 Tap Sound (built-in)
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTapSound() {
+  let osc = audioCtx.createOscillator();
+  let gain = audioCtx.createGain();
+
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+
+  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.15);
+}
+
+// 🎵 Background Music
+let bgMusic = new Audio("bgm.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.3;
+
+// Game variables
+let bird, pipes, frame, gameOver, score;
+
+// Reset
+function resetGame() {
+  bird = {
+    x: 80,
+    y: 200,
+    size: 50,
+    gravity: 0.25,
+    lift: -7,
+    velocity: 0
+  };
+
+  pipes = [];
+  frame = 0;
+  gameOver = false;
+  score = 0;
+  restartBtn.style.display = "none";
+}
+
+// Jump
+function jump() {
+  if (!gameOver) {
+    bird.velocity = bird.lift;
+    playTapSound();
+
+    // 🎵 Start music on first tap
+    if (bgMusic.paused) {
+      bgMusic.play();
+    }
+  }
+}
+
+// Controls
+canvas.addEventListener("pointerdown", jump);
+document.addEventListener("keydown", jump);
+
+// Restart
+restartBtn.onclick = function() {
+  resetGame();
+  bgMusic.pause();
+  bgMusic.currentTime = 0;
+};
+
+// Draw Bird
+function drawBird() {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(
+    bird.x + bird.size/2,
+    bird.y + bird.size/2,
+    bird.size/2,
+    0,
+    Math.PI * 2
+  );
+  ctx.clip();
+  ctx.drawImage(birdImg, bird.x, bird.y, bird.size, bird.size);
+  ctx.restore();
+}
+
+// Pipes
+function drawPipes() {
+  pipes.forEach((p) => {
+    p.x -= 1.5;
+
+    ctx.fillStyle = "green";
+    ctx.fillRect(p.x, 0, 50, p.top);
+    ctx.fillRect(p.x, p.bottom, 50, canvas.height);
+
+    // Score
+    if (!p.passed && p.x + 50 < bird.x) {
+      score++;
+      p.passed = true;
+    }
+
+    // Collision
+    if (
+      bird.x + bird.size > p.x &&
+      bird.x < p.x + 50 &&
+      (bird.y < p.top || bird.y + bird.size > p.bottom)
+    ) {
+      gameOver = true;
+      restartBtn.style.display = "block";
+      bgMusic.pause();
+    }
+  });
+}
+
+// Game loop
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!gameOver) {
+    bird.velocity += bird.gravity;
+    bird.y += bird.velocity;
+  }
+
+  drawBird();
+
+  if (frame % 90 === 0) {
+    let top = Math.random() * 200;
+    pipes.push({
+      x: canvas.width,
+      top: top,
+      bottom: top + 250,
+      passed: false
+    });
+  }
+
+  drawPipes();
+
+  if (bird.y > canvas.height || bird.y < 0) {
+    gameOver = true;
+    restartBtn.style.display = "block";
+    bgMusic.pause();
+  }
+
+  // Score
+  ctx.fillStyle = "black";
+  ctx.font = "24px Arial";
+  ctx.fillText("Score: " + score, 10, 30);
+
+  if (gameOver) {
+    ctx.fillText("GAME OVER", 90, 300);
+  }
+
+  frame++;
+  requestAnimationFrame(draw);
+}
+
+// Start
+resetGame();
+draw();
+</script>
+
+</body>
+</html>
